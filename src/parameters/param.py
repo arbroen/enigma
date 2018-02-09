@@ -22,13 +22,13 @@ class _Parameter:
         """Checks for type if applicable."""
         if self.type is None or isinstance(value, self.type):
             return value
-        else:
-            try:
-                return self.type(value)
-            except (ValueError, TypeError):
-                raise ParameterException(
-                    f"Given value {value} cannot be cast to {self.type} on "
-                    f"parameter {self.__class__.__qualname__}. Attr: {key}.")
+
+        try:
+            return self.type(value)
+        except (ValueError, TypeError):
+            raise ParameterException(
+                f"Given value {value} cannot be cast to {self.type} on "
+                f"parameter {self.__class__.__qualname__}. Attr: {key}.")
 
     def __init__(self, default: Any=None):
         """
@@ -37,14 +37,14 @@ class _Parameter:
         """
         self.default = self.__caster__(value=default, key='default')
 
-    def __get__(self, instance, owner=None):
+    def __get__(self, instance: Any, owner: Any=None) -> Any:
         return instance.__dict__.get(self, self.default)
 
-    def __set__(self, instance, value):
+    def __set__(self, instance: Any, value: Any) -> None:
         instance.__dict__[self] = \
             self.__caster__(value=value, key='value')
 
-    def __delete__(self, instance):
+    def __delete__(self, instance: Any) -> None:
         raise ParameterException(
             f"It is impossible to delete the parameter {self.name} on "
             f"{instance.__class__.__qualname__}.")
