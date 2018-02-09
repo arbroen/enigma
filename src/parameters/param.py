@@ -7,45 +7,42 @@ from .exceptions import ParameterException
 
 class _Parameter:
     """
-    ### Descriptor ###
+    ### Descriptor Protocol ###
+
     Enables control of the limits of the instance variable (type, value).
     Custom class since I'm assuming a lot of parameters wil be created in a
     game and this will create a level of protection during runtime.
     """
-    name: str = None
     type: Any = None
     cast: bool = False
+    name: str = None
     default: Any = None
 
-    def __setter__(self, value: Any, key: str) -> Any:
+    def __caster__(self, value: Any, key: str) -> Any:
         """Checks for type if applicable."""
-        if not self.cast:
+        if self.type is None or isinstance(value, self.type):
             return value
-
-        if not isinstance(value, self.type):
+        else:
             try:
                 return self.type(value)
-            except ValueError as e:
+            except (ValueError, TypeError):
                 raise ParameterException(
                     f"Given value {value} cannot be cast to {self.type} on "
-                    f"parameter {self.name}. Attribute: {key}.")
+                    f"parameter {self.__class__.__qualname__}. Attr: {key}.")
 
-    def __init__(self, cast: bool=False, default: Any=None):
+    def __init__(self, default: Any=None):
         """
-        :param cast:
-            Enable to attempt type conversion if value is not of self.type
         :param default:
             Value to be returned if None configured by other means.
         """
-        self.default = self.__setter__(value=default, key='default')
-        self.cast = cast
+        self.default = self.__caster__(value=default, key='default')
 
     def __get__(self, instance, owner=None):
-        return instance.__dict__.get(self.name, self.default)
+        return instance.__dict__.get(self, self.default)
 
     def __set__(self, instance, value):
-        instance.__dict__[self.name] = \
-            self.__setter__(value=value, key='value')
+        instance.__dict__[self] = \
+            self.__caster__(value=value, key='value')
 
     def __delete__(self, instance):
         raise ParameterException(
@@ -69,11 +66,21 @@ class MinMaxParameter(_Parameter):
     minimum = None
     maximum = None
 
-    def __init__(self, minimum, maximum, **kwargs):
+    def __min_max__(self, value):
+        if self.maximum < value or value < self.minimum:
+            raise ParameterException(
+                f"Value outside allowed range "
+                f"({self.maximum}-{value}-{self.minimum}).")
 
+    def __init__(self, minimum, maximum, default):
         self.minimum = minimum
         self.maximum = maximum
-        super(MinMaxParameter, self).__init__(**kwargs)
+        self.__min_max__(value=default)
+        super(MinMaxParameter, self).__init__(default)
+
+    def __set__(self, instance, value):
+        self.__min_max__(value=value)
+        super().__set__(instance=instance, value=value)
 
 
 class LimitedIntegerParameter(IntegerParameter, MinMaxParameter):
